@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).parent.parent.parent
@@ -9,3 +10,5 @@ FIELD_MAP_PATH = ASSETS_PATH / "field_map.json"
 
 with open(FIELD_MAP_PATH, "r") as file:
     FIELD_MAP = json.load(file)
+
+DB_FILEPATH = os.getenv("DB_FILEPATH")
