@@ -11,3 +11,4 @@ wheels/
 
 # Other
 assets/out.pdf
+*.db

@@ -3,6 +3,7 @@ import os
 from sqlalchemy import Connection, Engine, create_engine
 
 from app.config import DB_FILEPATH
+from app.db.models import Base
 
 
 class DatabaseManager:
@@ -11,6 +12,8 @@ class DatabaseManager:
 
         self.engine = self.init_engine()
         self.conn = self.engine.connect()
+
+        Base.metadata.create_all(self.engine)
 
     def init_engine(self) -> Engine:
         if not DB_FILEPATH:
