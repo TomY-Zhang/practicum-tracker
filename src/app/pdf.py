@@ -43,11 +43,11 @@ class TemplateEditor:
     def set_supervisor_name(self, value: str) -> None:
         self.update_field("supervisor_name", value)
 
-    def set_work_setting_name(self, value: str) -> None:
-        self.update_field("work_setting_name", value)
+    def set_workplace_name(self, value: str) -> None:
+        self.update_field("workplace_name", value)
 
-    def set_work_setting_address(self, value: str) -> None:
-        self.update_field("work_setting_address", value)
+    def set_workplace_address(self, value: str) -> None:
+        self.update_field("workplace_address", value)
 
     def set_bbs_file_number(self, value: int) -> None:
         self.update_field("bbs_file_number", str(value))
