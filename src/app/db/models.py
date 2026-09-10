@@ -33,17 +33,19 @@ class Supervisor(Base):
 
 class Workplace(Base):
     __tablename__ = "workplace"
-    __table_args__ = (Index("uq_workplace", "name", "address", unique=True),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
-    address: Mapped[str] = mapped_column(String(100), nullable=False)
+    street: Mapped[str] = mapped_column(String(50), nullable=False)
+    city: Mapped[str] = mapped_column(String(50), nullable=False)
+    state: Mapped[str] = mapped_column(String(2), nullable=False)
+    zipcode: Mapped[int] = mapped_column(Integer, nullable=False)
 
 
 class Log(Base):
     __tablename__ = "log"
 
-    date: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
+    date: Mapped[str] = mapped_column(String(10), primary_key=True, nullable=False)
     hours_a: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     hours_a1: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     hours_b: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
