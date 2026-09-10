@@ -45,7 +45,8 @@ class Workplace(Base):
 class Log(Base):
     __tablename__ = "log"
 
-    date: Mapped[str] = mapped_column(String(10), primary_key=True, nullable=False)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, nullable=False)
+    date: Mapped[str] = mapped_column(String(10), nullable=False, unique=True)
     hours_a: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     hours_a1: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     hours_b: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
