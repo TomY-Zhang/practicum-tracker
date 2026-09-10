@@ -40,11 +40,10 @@ class Workplace(Base):
     address: Mapped[str] = mapped_column(String(100), nullable=False)
 
 
-class WeekLog(Base):
-    __tablename__ = "weeklog"
+class Log(Base):
+    __tablename__ = "log"
 
-    year: Mapped[int] = mapped_column(Integer, primary_key=True, nullable=False)
-    week: Mapped[int] = mapped_column(Integer, primary_key=True, nullable=False)
+    date: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
     hours_a: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     hours_a1: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     hours_b: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
