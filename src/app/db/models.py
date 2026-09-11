@@ -20,8 +20,6 @@ class Associate(Base):
     last_name: Mapped[str] = mapped_column(String(30), nullable=False)
     bbs_file_number: Mapped[int | None] = mapped_column(Integer, unique=True)
     amft_number: Mapped[int | None] = mapped_column(Integer, unique=True)
-    supervisor: Mapped[int | None] = mapped_column(ForeignKey("supervisor.id"))
-    work_setting: Mapped[int | None] = mapped_column(ForeignKey("workplace.id"))
 
 
 class Supervisor(Base):
@@ -53,3 +51,5 @@ class Log(Base):
     hours_b1: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     hours_b2: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     hours_c: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    supervisor: Mapped[int | None] = mapped_column(ForeignKey("supervisor.id"))
+    work_setting: Mapped[int | None] = mapped_column(ForeignKey("workplace.id"))
