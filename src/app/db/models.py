@@ -1,5 +1,5 @@
-from sqlalchemy import ForeignKey, Index, Integer, String
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy import ForeignKey, Index, Integer, String, text
+from sqlalchemy.orm import DeclarativeBase, Mapped, MappedColumn, mapped_column
 
 
 class Base(DeclarativeBase):
@@ -43,13 +43,18 @@ class Workplace(Base):
 class Log(Base):
     __tablename__ = "log"
 
+    def _int_column() -> MappedColumn:
+        return mapped_column(
+            Integer, nullable=False, default=0, server_default=text("0")
+        )
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True, nullable=False)
     date: Mapped[str] = mapped_column(String(10), nullable=False, unique=True)
-    hours_a: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    hours_a1: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    hours_b: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    hours_b1: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    hours_b2: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    hours_c: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    supervisor: Mapped[int | None] = mapped_column(ForeignKey("supervisor.id"))
-    work_setting: Mapped[int | None] = mapped_column(ForeignKey("workplace.id"))
+    hours_a: Mapped[int] = _int_column()
+    hours_a1: Mapped[int] = _int_column()
+    hours_b: Mapped[int] = _int_column()
+    hours_b1: Mapped[int] = _int_column()
+    hours_b2: Mapped[int] = _int_column()
+    hours_c: Mapped[int] = _int_column()
+    supervisor_id: Mapped[int | None] = mapped_column(ForeignKey("supervisor.id"))
+    workplace_id: Mapped[int | None] = mapped_column(ForeignKey("workplace.id"))
