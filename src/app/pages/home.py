@@ -4,11 +4,29 @@ from sqlalchemy import select
 
 from app.db import DatabaseManager
 from app.db.models import Supervisor, Workplace
-
-dbm = DatabaseManager()
+from app.snapshot import Snapshot
 
 
 def load_session() -> None:
+    snapshot = Snapshot.get_latest()
+    if snapshot:
+        load_df_from_snapshot(snapshot)
+    else:
+        load_df_from_db()
+
+    supervisors = DatabaseManager.query(select(Supervisor))
+    st.session_state.supervisors = {s.name: s.id for s in supervisors}
+
+    workplaces = DatabaseManager.query(select(Workplace))
+    st.session_state.workplaces = {w.name: w for w in workplaces}
+
+
+def load_df_from_snapshot(snapshot: dict) -> None:
+    st.session_state.df = snapshot["df"]
+    st.session_state.editor = snapshot["changes"]
+
+
+def load_df_from_db() -> None:
     df = DatabaseManager.get_logs_dataframe()
     df["date"] = pd.to_datetime(df["date"], format="%Y-%m-%d")
     df.drop(
@@ -16,12 +34,6 @@ def load_session() -> None:
         inplace=True,
     )
     st.session_state.df = df
-
-    supervisors = DatabaseManager.query(select(Supervisor))
-    st.session_state.supervisors = {s.name: s.id for s in supervisors}
-
-    workplaces = DatabaseManager.query(select(Workplace))
-    st.session_state.workplaces = {w.name: w for w in workplaces}
 
 
 @st.dialog("Add Supervisor")
@@ -155,6 +167,7 @@ def render_page() -> None:
 
     with cols[-1]:
         if st.button("Save", use_container_width=True, type="primary"):
+            Snapshot.save(st.session_state.df, st.session_state.editor)
             st.toast("Timesheet successfully saved", icon="✅")
 
 

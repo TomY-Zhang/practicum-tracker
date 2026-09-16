@@ -1,6 +1,4 @@
 import os
-from dataclasses import dataclass
-from datetime import datetime
 
 import pandas as pd
 from sqlalchemy import create_engine, insert, orm, select
@@ -22,13 +20,6 @@ Base.metadata.create_all(engine)
 
 
 class DatabaseManager:
-    def __init__(self):
-        self.log_dates = set()
-
-        with Session() as session:
-            stmt = select(Log.date)
-            self.log_dates = set(session.scalars(stmt))
-
     @classmethod
     def query(cls, stmt: TypedReturnsRows):
         with Session() as session:
