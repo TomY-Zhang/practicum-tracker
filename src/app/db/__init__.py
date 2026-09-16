@@ -12,6 +12,6 @@ if not os.path.exists(DB_FILEPATH):
     raise FileNotFoundError(f"File at '{DB_FILEPATH}' does not exist")
 
 engine = create_engine(f"sqlite:///{DB_FILEPATH}", echo=True)
-session = orm.sessionmaker(bind=engine)
+Session = orm.sessionmaker(bind=engine)
 
 Base.metadata.create_all(engine)

@@ -1,5 +1,11 @@
 from sqlalchemy import ForeignKey, Index, Integer, String, text
-from sqlalchemy.orm import DeclarativeBase, Mapped, MappedColumn, mapped_column
+from sqlalchemy.orm import (
+    DeclarativeBase,
+    Mapped,
+    MappedColumn,
+    mapped_column,
+    relationship,
+)
 
 
 class Base(DeclarativeBase):
@@ -27,6 +33,10 @@ class Supervisor(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
+    workplace_id: Mapped[int] = mapped_column(ForeignKey("workplace.id"))
+
+    workplace: Mapped[Workplace] = relationship(back_populates="supervisor")
+    logs: Mapped[list[Log]] = relationship(back_populates="supervisor")
 
 
 class Workplace(Base):
@@ -38,6 +48,8 @@ class Workplace(Base):
     city: Mapped[str] = mapped_column(String(50), nullable=False)
     state: Mapped[str] = mapped_column(String(2), nullable=False)
     zipcode: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    supervisor: Mapped[Supervisor] = relationship(back_populates="workplace")
 
 
 class Log(Base):
@@ -56,5 +68,6 @@ class Log(Base):
     hours_b1: Mapped[int] = _int_column()
     hours_b2: Mapped[int] = _int_column()
     hours_c: Mapped[int] = _int_column()
-    supervisor_id: Mapped[int | None] = mapped_column(ForeignKey("supervisor.id"))
-    workplace_id: Mapped[int | None] = mapped_column(ForeignKey("workplace.id"))
+    supervisor_id: Mapped[int] = mapped_column(ForeignKey("supervisor.id"))
+
+    supervisor: Mapped[Supervisor] = relationship(back_populates="logs")
