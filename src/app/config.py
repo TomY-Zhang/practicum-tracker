@@ -11,4 +11,4 @@ FIELD_MAP_PATH = ASSETS_PATH / "field_map.json"
 with open(FIELD_MAP_PATH, "r") as file:
     FIELD_MAP = json.load(file)
 
-DB_FILEPATH = os.getenv("DB_FILEPATH")
+DB_FILE_PATH = os.getenv("DB_FILE_PATH")

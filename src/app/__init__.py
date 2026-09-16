@@ -2,7 +2,8 @@ import streamlit as st
 
 
 def main():
-    pg = st.navigation([st.Page("pages/home.py")])
+    st.set_page_config(layout="wide")
+    pg = st.navigation([st.Page("pages/home.py", title="Home", icon="🏠")])
     pg.run()
 
 

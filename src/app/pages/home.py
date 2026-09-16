@@ -1,6 +1,4 @@
-import pandas as pd
 import streamlit as st
-from sqlalchemy import select
 
 from app.db import DatabaseManager
 from app.db.models import Supervisor, Workplace
@@ -9,19 +7,9 @@ dbm = DatabaseManager()
 
 
 def load_session() -> None:
-    df = DatabaseManager.get_logs_dataframe()
-    df["date"] = pd.to_datetime(df["date"], format="%Y-%m-%d")
-    df.drop(
-        columns=["supervisor_id", "id", "workplace_id"],
-        inplace=True,
-    )
-    st.session_state.df = df
-
-    supervisors = DatabaseManager.query(select(Supervisor))
-    st.session_state.supervisors = {s.name: s.id for s in supervisors}
-
-    workplaces = DatabaseManager.query(select(Workplace))
-    st.session_state.workplaces = {w.name: w for w in workplaces}
+    st.session_state.df = DatabaseManager.get_logs_dataframe()
+    st.session_state.supervisors = DatabaseManager.get_supervisors()
+    st.session_state.workplaces = DatabaseManager.get_workplaces()
 
 
 @st.dialog("Add Supervisor")
@@ -36,9 +24,7 @@ def add_supervisor_dialog():
             if name and workplace:
                 wp: Workplace = st.session_state.workplaces.get(workplace)
                 if wp:
-                    DatabaseManager.insert_one(
-                        Supervisor(name=name, workplace_id=wp.id)
-                    )
+                    DatabaseManager.insert(Supervisor(name=name, workplace_id=wp.id))
                 else:
                     st.toast(
                         f"Error: unable to determine ID for workplace '{workplace}'",
@@ -66,7 +52,7 @@ def add_workplace_dialog():
         if st.form_submit_button("Submit", use_container_width=True, type="primary"):
             if name and street and city and state and zipcode:
                 if zipcode.isnumeric():
-                    DatabaseManager.insert_one(
+                    DatabaseManager.insert(
                         Workplace(
                             name=name,
                             street=street,
@@ -91,7 +77,7 @@ def render_page() -> None:
         column_config={
             "date": st.column_config.DateColumn(
                 label="Date",
-                format="YYYY-MM-DD",  # Formats display to show date only
+                format="YYYY-MM-DD",
                 required=True,
             ),
             "name": st.column_config.SelectboxColumn(
@@ -122,10 +108,6 @@ def render_page() -> None:
                 label="Supervision, Group",
                 default=0,
             ),
-            "hours_c": st.column_config.NumberColumn(
-                label="Week Total",
-                default=0,
-            ),
         },
         column_order=[
             "date",
@@ -135,12 +117,11 @@ def render_page() -> None:
             "hours_b",
             "hours_b1",
             "hours_b2",
-            "hours_c",
         ],
-        disabled=["_index", "hours_c"],
+        disabled=["_index"],
         key="editor",
         num_rows="dynamic",
-        height="auto",
+        height="content",
     )
 
     cols = st.columns([25, 2, 2, 1])
@@ -155,9 +136,9 @@ def render_page() -> None:
 
     with cols[-1]:
         if st.button("Save", use_container_width=True, type="primary"):
+            dbm.save(st.session_state.editor)
             st.toast("Timesheet successfully saved", icon="✅")
 
 
 load_session()
-st.set_page_config(page_title="Home", page_icon="🏠", layout="wide")
 render_page()

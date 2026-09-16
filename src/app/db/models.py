@@ -66,7 +66,6 @@ class Log(Base):
     hours_b: Mapped[int] = _int_column()
     hours_b1: Mapped[int] = _int_column()
     hours_b2: Mapped[int] = _int_column()
-    hours_c: Mapped[int] = _int_column()
     supervisor_id: Mapped[int] = mapped_column(ForeignKey("supervisor.id"))
 
     supervisor: Mapped[Supervisor] = relationship(back_populates="logs")

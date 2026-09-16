@@ -11,4 +11,5 @@ wheels/
 
 # Other
 assets/out.pdf
+assets/snapshots
 *.db
