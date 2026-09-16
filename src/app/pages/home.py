@@ -1,71 +1,44 @@
 import pandas as pd
 import streamlit as st
-from sqlalchemy import orm, select
+from sqlalchemy import select
 
-from app.db import Session, engine
-from app.db.models import Log, Supervisor, Workplace
+from app.db import DatabaseManager
+from app.db.models import Supervisor, Workplace
 
-# Setup
-column_map = {
-    "id": "ID",
-    "date": "Date",
-    "hours_a": "A Hours",
-    "hours_a1": "A1 Hours",
-    "hours_b": "B Hours",
-    "hours_b1": "B1 Hours",
-    "hours_b2": "B2 Hours",
-    "name": "Supervisor",
-}
+dbm = DatabaseManager()
 
 
-def load_df() -> None:
-    stmt = select(Log, Supervisor).join(
-        Supervisor,
-        Log.supervisor_id == Supervisor.id,
-    )
-    df = pd.read_sql_query(stmt, con=engine).rename(columns=column_map)
-    df["Date"] = pd.to_datetime(df["Date"], format="%Y-%m-%d")
+def load_session() -> None:
+    df = DatabaseManager.get_logs_dataframe()
+    df["date"] = pd.to_datetime(df["date"], format="%Y-%m-%d")
     df.drop(
-        columns=["supervisor_id", "id_1", "workplace_id", "hours_c"],
+        columns=["supervisor_id", "id", "workplace_id"],
         inplace=True,
     )
     st.session_state.df = df
 
+    supervisors = DatabaseManager.query(select(Supervisor))
+    st.session_state.supervisors = {s.name: s.id for s in supervisors}
 
-def load_supervisor_map(session: orm.Session | None = None) -> None:
-    if session:
-        supervisors = session.query(Supervisor).all()
-    else:
-        with Session() as s:
-            supervisors = s.query(Supervisor).all()
-    st.session_state.supervisor_ids = {s.name: s.id for s in supervisors}
-
-
-def load_workplace_map(session: orm.Session | None = None) -> None:
-    if session:
-        workplaces = session.query(Workplace).all()
-    else:
-        with Session() as s:
-            workplaces = s.query(Workplace).all()
-    st.session_state.workplace_ids = {w.name: w.id for w in workplaces}
+    workplaces = DatabaseManager.query(select(Workplace))
+    st.session_state.workplaces = {w.name: w for w in workplaces}
 
 
 @st.dialog("Add Supervisor")
 def add_supervisor_dialog():
     with st.form("Add Supervisor Form"):
-        name = st.text_input("Name")
+        name = st.text_input("Supervisor Name", max_chars=100)
 
-        workplace_names: list[str] = list(st.session_state.workplace_ids.keys())
+        workplace_names: list[str] = list(st.session_state.workplaces.keys())
         workplace = st.selectbox("Workplace", workplace_names)
 
-        if st.form_submit_button("Submit"):
+        if st.form_submit_button("Submit", use_container_width=True, type="primary"):
             if name and workplace:
-                workplace_id = st.session_state.workplace_ids.get(workplace)
-                if workplace_id:
-                    with Session() as session:
-                        session.add(Supervisor(name=name, workplace_id=workplace_id))
-                        session.commit()
-                        load_supervisor_map(session)
+                wp: Workplace = st.session_state.workplaces.get(workplace)
+                if wp:
+                    DatabaseManager.insert_one(
+                        Supervisor(name=name, workplace_id=wp.id)
+                    )
                 else:
                     st.toast(
                         f"Error: unable to determine ID for workplace '{workplace}'",
@@ -77,63 +50,114 @@ def add_supervisor_dialog():
                 st.toast("Please fill out all fields", icon="🚫")
 
 
-def validate_date() -> None:
-    pass
+@st.dialog("Add Workplace")
+def add_workplace_dialog():
+    with st.form("Add Workplace Form"):
+        name = st.text_input("Workplace Name", max_chars=100)
+        street = st.text_input("Street", max_chars=50)
+        city = st.text_input("City", max_chars=50)
+
+        cols = st.columns([1, 1])
+        with cols[0]:
+            state = st.text_input("State Abbreviation (e.g. CA, UT)", max_chars=2)
+        with cols[1]:
+            zipcode = st.text_input("Zip Code", max_chars=5)
+
+        if st.form_submit_button("Submit", use_container_width=True, type="primary"):
+            if name and street and city and state and zipcode:
+                if zipcode.isnumeric():
+                    DatabaseManager.insert_one(
+                        Workplace(
+                            name=name,
+                            street=street,
+                            city=city,
+                            state=state,
+                            zipcode=zipcode,
+                        )
+                    )
+                    st.toast(f"Added new workplace '{name}'", icon="✅")
+                    st.rerun()
+                else:
+                    st.toast("Zip code can only contain numbers", icon="🚫")
+            else:
+                st.toast("Please fill out all fields", icon="🚫")
 
 
-def save_timesheet() -> None:
-    pass
+def render_page() -> None:
+    st.title("Timesheet")
+
+    st.data_editor(
+        st.session_state.df,
+        column_config={
+            "date": st.column_config.DateColumn(
+                label="Date",
+                format="YYYY-MM-DD",  # Formats display to show date only
+                required=True,
+            ),
+            "name": st.column_config.SelectboxColumn(
+                label="Supervisor",
+                help="Select supervisor",
+                options=st.session_state.supervisors.keys(),
+                required=True,
+            ),
+            "hours_a": st.column_config.NumberColumn(
+                "Direct Counseling",
+                help="Individuals, groups, couples, and families",
+                default=0,
+            ),
+            "hours_a1": st.column_config.NumberColumn(
+                label="Diagosis & Treatment",
+                help="Couples, families, and children",
+                default=0,
+            ),
+            "hours_b": st.column_config.NumberColumn(
+                label="Non-Clinical Experience",
+                default=0,
+            ),
+            "hours_b1": st.column_config.NumberColumn(
+                label="Supervision, Individual, & Triadic",
+                default=0,
+            ),
+            "hours_b2": st.column_config.NumberColumn(
+                label="Supervision, Group",
+                default=0,
+            ),
+            "hours_c": st.column_config.NumberColumn(
+                label="Week Total",
+                default=0,
+            ),
+        },
+        column_order=[
+            "date",
+            "name",
+            "hours_a",
+            "hours_a1",
+            "hours_b",
+            "hours_b1",
+            "hours_b2",
+            "hours_c",
+        ],
+        disabled=["_index", "hours_c"],
+        key="editor",
+        num_rows="dynamic",
+        height="auto",
+    )
+
+    cols = st.columns([25, 2, 2, 1])
+
+    with cols[-3]:
+        if st.button("Add Supervisor", use_container_width=True):
+            add_supervisor_dialog()
+
+    with cols[-2]:
+        if st.button("Add Workplace", use_container_width=True):
+            add_workplace_dialog()
+
+    with cols[-1]:
+        if st.button("Save", use_container_width=True, type="primary"):
+            st.toast("Timesheet successfully saved", icon="✅")
 
 
-# Session state config
-load_df()
-load_supervisor_map()
-load_workplace_map()
-
-
-# Render page
+load_session()
 st.set_page_config(page_title="Home", page_icon="🏠", layout="wide")
-st.title("Timesheet")
-
-st.data_editor(
-    st.session_state.df,
-    column_config={
-        "Date": st.column_config.DateColumn(
-            "Date",
-            format="YYYY-MM-DD",  # Formats display to show date only
-            required=True,
-        ),
-        "Supervisor": st.column_config.SelectboxColumn(
-            "Supervisor",
-            help="Select supervisor",
-            options=st.session_state.supervisor_ids.keys(),
-            required=True,
-        ),
-    },
-    column_order=[
-        "Date",
-        "A Hours",
-        "A1 Hours",
-        "B Hours",
-        "B1 Hours",
-        "B2 Hours",
-        "C Hours",
-        "Supervisor",
-    ],
-    disabled=["ID", "_index"],
-    key="editor",
-    num_rows="dynamic",
-    hide_index=False,
-    height="auto",
-)
-
-_, col1, col2 = st.columns([30, 2, 1])
-
-with col1:
-    if st.button("Add Supervisor", use_container_width=True):
-        add_supervisor_dialog()
-
-with col2:
-    if st.button("Save", use_container_width=True):
-        save_timesheet()
-        st.toast("Timesheet successfully saved", icon="✅")
+render_page()

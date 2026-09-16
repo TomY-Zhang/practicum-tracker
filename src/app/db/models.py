@@ -60,8 +60,7 @@ class Log(Base):
             Integer, nullable=False, default=0, server_default=text("0")
         )
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, nullable=False)
-    date: Mapped[str] = mapped_column(String(10), nullable=False, unique=True)
+    date: Mapped[str] = mapped_column(String(10), primary_key=True, nullable=False)
     hours_a: Mapped[int] = _int_column()
     hours_a1: Mapped[int] = _int_column()
     hours_b: Mapped[int] = _int_column()
