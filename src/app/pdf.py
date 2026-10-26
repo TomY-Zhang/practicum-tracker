@@ -1,3 +1,4 @@
+import io
 from datetime import date
 from enum import StrEnum, auto
 from pathlib import Path
@@ -23,10 +24,11 @@ class TemplateEditor:
         self.writer.append(self.reader)
         self.updates: dict[str, str] = {}
 
-    def write_to_file(self, path: Path) -> None:
+    def write_to_bytes(self) -> bytes:
         self.writer.update_page_form_field_values(self.writer.pages[0], self.updates)
-        with open(path, "wb") as f:
-            self.writer.write(f)
+        ostream = io.BytesIO()
+        self.writer.write(ostream)
+        return ostream.getvalue()
 
     def update_field(self, field: str, value: str) -> None:
         self.updates[FIELD_MAP[field]] = value
@@ -58,6 +60,9 @@ class TemplateEditor:
 
     def set_amft_number(self, value: int) -> None:
         self.update_field("amft_number", str(value))
+
+    def set_year(self, value: int) -> None:
+        self.update_field("year", str(value))
 
     def set_week_date(self, week_no: int, value: date) -> None:
         self.update_field(f"week_{week_no}", f"{value.month}/{value.day}")

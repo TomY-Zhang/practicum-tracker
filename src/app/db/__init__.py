@@ -26,6 +26,7 @@ class DatabaseManager:
     def __init__(self):
         self.df = DatabaseManager.get_logs_dataframe()
         self.supervisors = DatabaseManager.get_supervisors()
+        self.workplaces = DatabaseManager.get_workplaces()
 
     def save(cls, changes: dict):
         added = changes.get("added_rows", [])
