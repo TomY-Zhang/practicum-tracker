@@ -3,10 +3,10 @@ from datetime import date, datetime, timedelta
 import streamlit as st
 from pandas import DataFrame, Timestamp
 
+from app.backend import DatabaseManager
+from app.backend.models import Supervisor, Workplace
+from app.backend.pdf import Column, TemplateEditor
 from app.config import GENERATED_PDF_NAME, TEMPLATE_FILE_PATH
-from app.db import DatabaseManager
-from app.db.models import Supervisor, Workplace
-from app.pdf import Column, TemplateEditor
 
 dbm = DatabaseManager()
 
