@@ -5,12 +5,15 @@ from pathlib import Path
 
 if getattr(sys, "frozen", False):
     REPO_ROOT = Path(getattr(sys, "_MEIPASS", os.getcwd()))
+    WEBAPP_DIR = REPO_ROOT
 else:
     REPO_ROOT = Path(__file__).resolve().parents[2]
+    WEBAPP_DIR = REPO_ROOT / "src" / "webapp"
 
-ASSETS_PATH = REPO_ROOT / "assets"
-TEMPLATE_FILE_PATH = ASSETS_PATH / "template.pdf"
-FIELD_MAP_PATH = ASSETS_PATH / "field_map.json"
+
+ASSETS_DIR = REPO_ROOT / "assets"
+TEMPLATE_FILE_PATH = ASSETS_DIR / "template.pdf"
+FIELD_MAP_PATH = ASSETS_DIR / "field_map.json"
 GENERATED_PDF_NAME = "weekly_log.pdf"
 
 with open(FIELD_MAP_PATH, "r") as file:

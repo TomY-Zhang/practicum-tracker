@@ -1,21 +1,21 @@
-import os
 import sys
-from pathlib import Path
 
 import streamlit.web.cli as stcli
 
-
-def resolve_path(path: str) -> str:
-    base_path = getattr(sys, "_MEIPASS", os.getcwd())
-    return str(Path(base_path) / path)
+from webapp.config import WEBAPP_DIR
 
 
-if __name__ == "__main__":
+def main():
+    path_str = str(WEBAPP_DIR / "pages" / "__init__.py")
     sys.argv = [
         "streamlit",
         "run",
-        resolve_path("pages/__init__.py"),
+        path_str,
         "--global.developmentMode=false",
         "--server.headless=true",
     ]
     sys.exit(stcli.main())
+
+
+if __name__ == "__main__":
+    main()
