@@ -5,7 +5,7 @@ from pathlib import Path
 
 from pypdf import PdfReader, PdfWriter
 
-from app.config import FIELD_MAP
+from webapp.config import FIELD_MAP
 
 
 class Column(StrEnum):

@@ -4,7 +4,7 @@ import pandas as pd
 from sqlalchemy import create_engine, delete, orm, select, update
 from sqlalchemy.sql.selectable import TypedReturnsRows
 
-from app.config import DB_FILE_PATH
+from webapp.config import DB_FILE_PATH
 
 from .models import Base, Log, Supervisor, Workplace
 

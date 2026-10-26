@@ -7,15 +7,15 @@ from PyInstaller.utils.hooks import collect_submodules
 sys.path.insert(0, str(Path("src").resolve()))
 
 a = Analysis(
-    ['src/app/__init__.py'],
+    ['src/webapp/__init__.py'],
     pathex=["src"],
     binaries=[],
     datas=[
-        ("src/app/pages", "pages"),
+        ("src/webapp/pages", "pages"),
         ("assets", "assets"),
     ],
-    hiddenimports=collect_submodules("app"),
-    hookspath=['src/app/hooks'],
+    hiddenimports=collect_submodules("webapp"),
+    hookspath=['src/webapp/hooks'],
     hooksconfig={},
     runtime_hooks=[],
     excludes=[],
@@ -29,7 +29,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='app',
+    name='tracker',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -48,5 +48,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='app',
+    name='webapp',
 )

@@ -1,5 +1,5 @@
 [project]
-name = "app"
+name = "webapp"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -55,6 +55,6 @@ extend-select = ["I"]
 
 [tool.uv.workspace]
 members = [
-    "app",
+    "webapp",
 ]
 
