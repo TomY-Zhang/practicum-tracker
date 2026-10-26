@@ -1,8 +1,13 @@
 import json
 import os
+import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).parent.parent.parent
+if getattr(sys, "frozen", False):
+    REPO_ROOT = getattr(sys, "_MEIPASS", Path.cwd())
+else:
+    REPO_ROOT = Path(__file__).resolve().parents[2]
+
 APP_ROOT = REPO_ROOT / "src" / "app"
 ASSETS_PATH = REPO_ROOT / "assets"
 TEMPLATE_FILE_PATH = ASSETS_PATH / "template.pdf"
