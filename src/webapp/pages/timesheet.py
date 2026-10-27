@@ -222,7 +222,7 @@ def render_page() -> None:
         height="content",
     )
 
-    cols = st.columns([20, 3, 3, 3, 2])
+    cols = st.columns([15, 3, 3, 3, 2])
 
     with cols[-4]:
         if st.button("Add Supervisor", use_container_width=True, icon="👨‍💼"):
