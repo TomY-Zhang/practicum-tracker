@@ -7,6 +7,9 @@ use tauri::Manager;
 use tauri_plugin_shell::ShellExt;
 use tokio::time::sleep;
 
+// TODO: add a way to gracefully shutdown the sidecar when the main window is closed
+// TODO: inject environment variables into the sidecar process
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
@@ -18,7 +21,7 @@ fn main() {
                 let (mut _rx, mut _child) = sidecar.spawn().expect("Failed to spawn sidecar");
 
                 // wait for the streamlit server to start
-                sleep(Duration::from_secs(5)).await;
+                sleep(Duration::from_secs(2)).await;
                 main_window
                     .eval("window.location.replace('http://localhost:8501');")
                     .expect("Failed to load the URL in the main window");

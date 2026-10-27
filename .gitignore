@@ -10,9 +10,9 @@ wheels/
 .venv
 
 # Tauri
-tauri-app/src-tauri/binaries/*
-tauri-app/src-tauri/target/
-tauri-app/src-tauri/gen/schemas
+tauri-app/binaries/*
+tauri-app/target/
+tauri-app/gen/schemas
 
 # Logs
 logs
