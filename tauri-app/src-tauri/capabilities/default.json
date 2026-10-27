@@ -7,15 +7,6 @@
   ],
   "permissions": [
     "core:default",
-    "opener:default",
-    {
-      "identifier": "shell:allow-execute",
-      "allow": [
-        {
-          "name": "binaries/my-binary",
-          "sidecar": true
-        }
-      ]
-    }
+    "opener:default"
   ]
 }

@@ -10,7 +10,7 @@ wheels/
 .venv
 
 # Tauri
-tauri-app/src-tauri/binaries/tracker-*
+tauri-app/src-tauri/binaries/*
 tauri-app/src-tauri/target/
 tauri-app/src-tauri/gen/schemas
 
@@ -43,4 +43,3 @@ dist-ssr
 assets/out.pdf
 assets/snapshots
 *.db
-tauri-app/src-tauri/binaries/tracker-*
