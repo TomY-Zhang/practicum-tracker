@@ -122,7 +122,7 @@ class DatabaseManager:
     @classmethod
     def get_supervisors(cls) -> dict[str, int]:
         supervisors = DatabaseManager.query(select(Supervisor))
-        name_id_map = {s.name: s.id for s in supervisors}
+        name_id_map = {s.name: s for s in supervisors}
 
         cls.supervisors = name_id_map
         return name_id_map
@@ -130,7 +130,7 @@ class DatabaseManager:
     @classmethod
     def get_workplaces(cls) -> dict[str, int]:
         workplaces = DatabaseManager.query(select(Workplace))
-        name_id_map = {w.name: w.id for w in workplaces}
+        name_id_map = {w.name: w for w in workplaces}
 
         cls.workplaces = name_id_map
         return name_id_map
