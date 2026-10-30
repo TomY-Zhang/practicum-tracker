@@ -186,7 +186,7 @@ def add_workplace_dialog():
 
 
 def render_log_editor():
-    row1 = st.columns([6, 72, 6, 6, 10], gap="xsmall", vertical_alignment="bottom")
+    row1 = st.columns([12, 54, 12, 12, 20], gap="xsmall", vertical_alignment="bottom")
     with row1[0]:
         st.subheader("Logs")
     with row1[-3]:
@@ -266,7 +266,7 @@ def render_log_editor():
         height=get_df_height(st.session_state.log_df),
     )
 
-    row = st.columns([92, 8])
+    row = st.columns([84, 16])
     with row[1]:
         st.button(
             "Add Log Entry",
@@ -305,7 +305,7 @@ def render_supervisor_editor():
         ),
     )
 
-    row = st.columns([92, 8])
+    row = st.columns([84, 16])
     with row[1]:
         st.button(
             "Add Supervisor",
@@ -338,7 +338,7 @@ def render_workplace_editor():
         ),
     )
 
-    row = st.columns([92, 8])
+    row = st.columns([84, 16])
     with row[1]:
         st.button(
             "Add Workplace",
@@ -351,7 +351,7 @@ def render_workplace_editor():
 st.title("📝 Timesheet")
 tabs = st.tabs(["Timesheet", "Associate"])
 with tabs[0]:
-    row = st.columns([95, 5])
+    row = st.columns([90, 10])
     with row[1]:
         if st.button("Save all", type="primary", use_container_width=True):
             try:
