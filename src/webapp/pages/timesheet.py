@@ -15,6 +15,7 @@ def load_session() -> None:
     st.session_state.df = dbm.df
     st.session_state.supervisors = dbm.supervisors
     st.session_state.workplaces = dbm.workplaces
+    print(st.session_state.workplaces)
 
 
 @st.dialog("Add Supervisor", icon="👨‍💼")
@@ -27,9 +28,9 @@ def add_supervisor_dialog():
 
         if st.form_submit_button("Submit", use_container_width=True, type="primary"):
             if name and workplace:
-                wp: Workplace = st.session_state.workplaces.get(workplace)
-                if wp:
-                    DatabaseManager.insert(Supervisor(name=name, workplace_id=wp.id))
+                wp_id = st.session_state.workplaces.get(workplace)
+                if wp_id:
+                    DatabaseManager.insert(Supervisor(name=name, workplace_id=wp_id))
                 else:
                     st.toast(
                         f"Error: unable to determine ID for workplace '{workplace}'",
