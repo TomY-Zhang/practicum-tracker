@@ -3,14 +3,19 @@ from enum import StrEnum
 
 import streamlit as st
 from dateutil.relativedelta import relativedelta
-from pandas import Timestamp
+from pandas import DataFrame, Timestamp
 from sqlalchemy.exc import IntegrityError
 
 from webapp.lib.manager import DatabaseManager
 from webapp.lib.models import Log, Supervisor, Workplace
 
+MAX_ROWS = 10
+MAX_DATAFRAME_HEIGHT = 350  # 10 rows, 35 pixels per row
+
 dbm = DatabaseManager()
-st.session_state.df = dbm.df
+st.session_state.log_df = dbm.log_df
+st.session_state.sp_df = dbm.supervisor_df
+supervisors = dbm.get_supervisors
 
 
 class ViewScope(StrEnum):
@@ -18,14 +23,8 @@ class ViewScope(StrEnum):
     Month = "Month"
 
 
-def update_filter_absolute():
-    print("TEST")
-    date = st.session_state.view_scope_date
-    print("NICE", date)
-
-
 def filter_view(view_date: date, scope: ViewScope):
-    df = st.session_state.df
+    df = st.session_state.log_df
 
     if scope == ViewScope.Week:
         start = get_week_start_sunday(view_date)
@@ -38,7 +37,7 @@ def filter_view(view_date: date, scope: ViewScope):
             df["date"] <= Timestamp(last_day_of_month)
         )
 
-    st.session_state.df = df.loc[mask]
+    st.session_state.log_df = df.loc[mask]
 
 
 def supervisor_label(supervisor_id: int) -> str:
@@ -50,6 +49,10 @@ def supervisor_label(supervisor_id: int) -> str:
 def get_week_start_sunday(dt: date) -> date:
     days_since_sunday = (dt.weekday() + 1) % 7
     return dt - timedelta(days=days_since_sunday)
+
+
+def get_df_height(df: DataFrame):
+    return MAX_DATAFRAME_HEIGHT if len(df) >= MAX_ROWS else "auto"
 
 
 @st.dialog("New Log Entry", width="medium")
@@ -117,6 +120,17 @@ def log_entry_dialog():
 
 @st.dialog("Add Supervisor", icon="👨‍💼")
 def add_supervisor_dialog():
+    def insert_supervisor(s: Supervisor):
+        try:
+            dbm.insert(s)
+            st.toast(f"Added new supervisor '{name}' ({workplace.name}).", icon="✅")
+            st.rerun()
+        except IntegrityError:
+            st.toast(
+                f"Supervisor name '{name}' is already taken. Please enter another name.",
+                icon="🚫",
+            )
+
     with st.form("Add Supervisor Form"):
         name = st.text_input("Supervisor Name", max_chars=100)
         workplace = st.selectbox(
@@ -124,19 +138,7 @@ def add_supervisor_dialog():
         )
         if st.form_submit_button("Submit", use_container_width=True, type="primary"):
             if name and workplace:
-                try:
-                    DatabaseManager.insert(
-                        Supervisor(name=name, workplace_id=workplace.id)
-                    )
-                    st.toast(
-                        f"Added new supervisor '{name}' ({workplace.name}).", icon="✅"
-                    )
-                    st.rerun()
-                except IntegrityError:
-                    st.toast(
-                        f"Supervisor name '{name}' is already taken. Please enter another name.",
-                        icon="🚫",
-                    )
+                insert_supervisor(Supervisor(name=name, workplace_id=workplace.id))
             else:
                 st.toast("Please fill out all fields.", icon="🚫")
 
@@ -157,7 +159,7 @@ def add_workplace_dialog():
         if st.form_submit_button("Submit", use_container_width=True, type="primary"):
             if name and street and city and state and zipcode:
                 if zipcode.isnumeric():
-                    DatabaseManager.insert(
+                    dbm.insert(
                         Workplace(
                             name=name,
                             street=street,
@@ -174,98 +176,139 @@ def add_workplace_dialog():
                 st.toast("Please fill out all fields.", icon="🚫")
 
 
+def render_log_editor():
+    st.subheader("Logs")
+    row1 = st.columns([88, 6, 6], gap="xsmall", vertical_alignment="top")
+    with row1[-2]:
+        view_date = st.date_input(
+            "View Date",
+            label_visibility="collapsed",
+            key="view_scope_date",
+        )
+    with row1[-1]:
+        view_scope = st.selectbox(
+            "View Scope",
+            label_visibility="collapsed",
+            options=[v for v in ViewScope],
+        )
+    filter_view(view_date, view_scope)
+    st.data_editor(
+        st.session_state.log_df,
+        column_config={
+            "date": st.column_config.DateColumn(
+                label="🗓️ Date",
+                help="Log Entry Date",
+                format="YYYY-MM-DD",
+                disabled=True,
+            ),
+            "supervisor_id": st.column_config.SelectboxColumn(
+                label="👨‍💼 Supervisor",
+                help="Select a supervisor",
+                options=(float(s.id) for s in dbm.supervisors),
+                format_func=lambda id_: supervisor_label(int(id_)),
+                required=True,
+            ),
+            "hours_a": st.column_config.NumberColumn(
+                "🫂 Direct Counseling",
+                help="Individuals, groups, couples, and families",
+                default=0,
+            ),
+            "hours_a1": st.column_config.NumberColumn(
+                label="🩺 Diagnosis & Treatment",
+                help="Couples, families, and children",
+                default=0,
+            ),
+            "hours_b": st.column_config.NumberColumn(
+                label="💡 Non-Clinical Experience",
+                default=0,
+            ),
+            "hours_b1": st.column_config.NumberColumn(
+                label="🕵🏻‍♂️ Supervision, Individual, & Triadic",
+                default=0,
+            ),
+            "hours_b2": st.column_config.NumberColumn(
+                label="🔍 Supervision, Group",
+                default=0,
+            ),
+        },
+        column_order=[
+            "date",
+            "supervisor_id",
+            "hours_a",
+            "hours_a1",
+            "hours_b",
+            "hours_b1",
+            "hours_b2",
+        ],
+        num_rows="delete",
+        disabled=["_index"],
+        hide_index=True,
+        key="log_editor",
+        height=get_df_height(st.session_state.log_df),
+    )
+
+    row = st.columns([87, 8, 5], gap="xsmall")
+    with row[1]:
+        st.button(
+            "Add Log Entry",
+            on_click=log_entry_dialog,
+            use_container_width=True,
+            icon="📝",
+        )
+    with row[2]:
+        if st.button("Save", key="save_logs", type="primary", use_container_width=True):
+            dbm.save(Log, st.session_state.log_editor)
+            st.toast("Saved log data", icon="✅", duration=1)
+
+
+def render_supervisor_editor():
+    st.subheader("Supervisors")
+    st.data_editor(
+        st.session_state.sp_df,
+        column_config={
+            "name": st.column_config.TextColumn(
+                label="👨‍💼 Supervisor",
+                help="Supervisor name",
+                required=True,
+            ),
+            "workplace_id": st.column_config.SelectboxColumn(
+                label="🏢 Workplace",
+                help="Select a workplace",
+                options=(float(w.id) for w in dbm.workplaces),
+                required=True,
+            ),
+        },
+        column_order=["name", "workplace_id"],
+        num_rows="delete",
+        disabled=["_index"],
+        hide_index=True,
+        key="sp_editor",
+        height=get_df_height(
+            st.session_state.sp_df,
+        ),
+    )
+
+    row = st.columns([87, 8, 5], gap="xsmall")
+    with row[1]:
+        st.button(
+            "Add Supervisor",
+            on_click=add_supervisor_dialog,
+            use_container_width=True,
+            icon="👨‍💼",
+        )
+    with row[2]:
+        if st.button(
+            "Save", key="save_supervisor", type="primary", use_container_width=True
+        ):
+            dbm.save(Supervisor, st.session_state.sp_editor)
+            st.toast("Saved supervisor data", icon="✅", duration=1)
+
+
 st.title("📝 Timesheet")
-
-row1 = st.columns([88, 6, 6], gap="xsmall")
-with row1[-2]:
-    view_date = st.date_input(
-        "Date",
-        label_visibility="collapsed",
-        key="view_scope_date",
-        on_change=update_filter_absolute,
-    )
-with row1[-1]:
-    view_scope = st.selectbox(
-        "View Scope",
-        label_visibility="collapsed",
-        options=[v for v in ViewScope],
-    )
-
-filter_view(view_date, view_scope)
-st.data_editor(
-    st.session_state.df,
-    column_config={
-        "date": st.column_config.DateColumn(
-            label="🗓️ Date",
-            help="Log Entry Date",
-            format="YYYY-MM-DD",
-            disabled=True,
-        ),
-        "supervisor_id": st.column_config.SelectboxColumn(
-            label="👨‍💼 Supervisor",
-            help="Select a supervisor",
-            options=(float(s.id) for s in dbm.supervisors),
-            format_func=lambda id_: supervisor_label(int(id_)),
-            required=True,
-        ),
-        "hours_a": st.column_config.NumberColumn(
-            "🫂 Direct Counseling",
-            help="Individuals, groups, couples, and families",
-            default=0,
-        ),
-        "hours_a1": st.column_config.NumberColumn(
-            label="🩺 Diagnosis & Treatment",
-            help="Couples, families, and children",
-            default=0,
-        ),
-        "hours_b": st.column_config.NumberColumn(
-            label="💡 Non-Clinical Experience",
-            default=0,
-        ),
-        "hours_b1": st.column_config.NumberColumn(
-            label="🕵🏻‍♂️ Supervision, Individual, & Triadic",
-            default=0,
-        ),
-        "hours_b2": st.column_config.NumberColumn(
-            label="🔍 Supervision, Group",
-            default=0,
-        ),
-    },
-    column_order=[
-        "date",
-        "supervisor_id",
-        "hours_a",
-        "hours_a1",
-        "hours_b",
-        "hours_b1",
-        "hours_b2",
-    ],
-    num_rows="delete",
-    disabled=["_index"],
-    hide_index=True,
-    key="editor",
-)
-
-row2 = st.columns([71, 8, 8, 8, 5], gap="xsmall")
-with row2[-4]:
-    st.button(
-        "Add Log Entry", on_click=log_entry_dialog, use_container_width=True, icon="📝"
-    )
-with row2[-3]:
-    st.button(
-        "Add Supervisor",
-        on_click=add_supervisor_dialog,
-        use_container_width=True,
-        icon="👨‍💼",
-    )
-with row2[-2]:
-    st.button(
-        "Add Workplace",
-        on_click=add_workplace_dialog,
-        use_container_width=True,
-        icon="🏢",
-    )
-with row2[-1]:
-    if st.button("Save", type="primary", use_container_width=True):
-        dbm.save(st.session_state.editor)
-        st.toast("Timesheet successfully saved", icon="✅")
+tabs = st.tabs(["Timesheet", "Associate"])
+with tabs[0]:
+    render_log_editor()
+    st.space(size="large")
+    render_supervisor_editor()
+with tabs[1]:
+    pass

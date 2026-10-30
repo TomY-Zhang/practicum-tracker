@@ -8,22 +8,25 @@ from .models import Base, Log, Supervisor, Workplace
 
 class DatabaseManager:
     def __init__(self):
-        self.df = DatabaseManager.get_logs_as_df()
-        self.supervisors = DatabaseManager.get_supervisors()
-        self.workplaces = DatabaseManager.get_workplaces()
+        self.supervisors = self.get_supervisors()
+        self.workplaces = self.get_workplaces()
 
-    def save(cls, changes: dict):
+        self.log_df = self.get_logs_as_df()
+        self.supervisor_df = self.get_supervisors_as_df()
+
+    def save(self, model: type[Base], changes: dict):
         edited = changes.get("edited_rows", {})
-        cls.save_edited(edited)
-
         deleted = changes.get("deleted_rows", [])
-        cls.save_deleted(deleted)
 
-    def save_edited(cls, edited_rows: dict):
+        if model == Log:
+            self.save_edited_logs(edited)
+            self.save_deleted_logs(deleted)
+
+    def save_edited_logs(self, edited_rows: dict):
         updates = []
         for df_idx, row in edited_rows.items():
             try:
-                row["date"] = cls.logs_df.at[df_idx, "date"].strftime("%Y-%m-%d")
+                row["date"] = self.log_df.at[df_idx, "date"].strftime("%Y-%m-%d")
                 updates.append(row)
             except KeyError:
                 raise KeyError(
@@ -31,13 +34,13 @@ class DatabaseManager:
                 )
 
         if len(updates) > 0:
-            cls.operation_many(update(Log), updates)
+            DatabaseManager.operation_many(update(Log), updates)
 
-    def save_deleted(cls, deleted_rows: list[int]):
+    def save_deleted_logs(self, deleted_rows: list[int]):
         deletes = []
         for df_idx in deleted_rows:
             try:
-                date = cls.logs_df.at[df_idx, "date"].strftime("%Y-%m-%d")
+                date = self.log_df.at[df_idx, "date"].strftime("%Y-%m-%d")
                 deletes.append(date)
             except KeyError:
                 raise KeyError(
@@ -46,7 +49,26 @@ class DatabaseManager:
 
         if len(deletes) > 0:
             stmt = delete(Log).where(Log.date.in_(deletes))
-            cls.operation_many(stmt)
+            DatabaseManager.operation_many(stmt)
+
+    def get_logs_as_df(self) -> pd.DataFrame:
+        df = pd.read_sql_query(select(Log), con=engine)
+        df["date"] = pd.to_datetime(df["date"], format="%Y-%m-%d")
+        self.log_df = df.sort_values(by="date", ascending=True)
+        return self.log_df
+
+    def get_supervisors_as_df(self) -> pd.DataFrame:
+        df = pd.read_sql_query(select(Supervisor), con=engine)
+        self.supervisor_df = df.sort_values(by=["name", "workplace_id"], ascending=True)
+        return self.supervisor_df
+
+    def get_supervisors(self) -> list[Supervisor]:
+        self.supervisors = DatabaseManager.query(select(Supervisor))
+        return self.supervisors
+
+    def get_workplaces(self) -> list[Workplace]:
+        self.workplaces = DatabaseManager.query(select(Workplace))
+        return self.workplaces
 
     @classmethod
     def query(cls, stmt: TypedReturnsRows):
@@ -70,23 +92,3 @@ class DatabaseManager:
             else:
                 session.execute(stmt)
             session.commit()
-
-    @classmethod
-    def get_logs_as_df(cls) -> pd.DataFrame:
-        df = pd.read_sql_query(select(Log), con=engine)
-        df["date"] = pd.to_datetime(df["date"], format="%Y-%m-%d")
-        df = df.sort_values(by="date", ascending=True)
-        cls.logs_df = df
-        return df
-
-    @classmethod
-    def get_supervisors(cls) -> list[Supervisor]:
-        supervisors = DatabaseManager.query(select(Supervisor))
-        cls.supervisors = list(supervisors)
-        return cls.supervisors
-
-    @classmethod
-    def get_workplaces(cls) -> list[Workplace]:
-        workplaces = DatabaseManager.query(select(Workplace))
-        cls.workplaces = list(workplaces)
-        return cls.workplaces
