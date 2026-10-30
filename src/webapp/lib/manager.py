@@ -13,42 +13,44 @@ class DatabaseManager:
 
         self.log_df = self.get_logs_as_df()
         self.supervisor_df = self.get_supervisors_as_df()
+        self.workplace_df = self.get_workplaces_as_df()
 
     def save(self, model: type[Base], changes: dict):
-        edited = changes.get("edited_rows", {})
-        deleted = changes.get("deleted_rows", [])
-
         if model == Log:
-            self.save_edited_logs(edited)
-            self.save_deleted_logs(deleted)
+            df = self.log_df
+        else:
+            df = self.supervisor_df
 
-    def save_edited_logs(self, edited_rows: dict):
+        self.save_edited(model, changes.get("edited_rows", {}), df)
+        self.save_deleted(model, changes.get("deleted_rows", []), df)
+
+    def save_edited(self, model: type[Base], edited_rows: dict, df: pd.DataFrame):
         updates = []
         for df_idx, row in edited_rows.items():
             try:
-                row["date"] = self.log_df.at[df_idx, "date"].strftime("%Y-%m-%d")
+                row["id"] = int(df.iloc[df_idx]["id"])
                 updates.append(row)
             except KeyError:
                 raise KeyError(
-                    f"Failed to update log: no row at dataframe index {df_idx}"
+                    f"Failed to update {model}: no row at dataframe index {df_idx}"
                 )
-
         if len(updates) > 0:
-            DatabaseManager.operation_many(update(Log), updates)
+            DatabaseManager.operation_many(update(model), updates)
 
-    def save_deleted_logs(self, deleted_rows: list[int]):
+    def save_deleted(
+        self, model: type[Base], deleted_rows: list[int], df: pd.DataFrame
+    ):
         deletes = []
         for df_idx in deleted_rows:
             try:
-                date = self.log_df.at[df_idx, "date"].strftime("%Y-%m-%d")
-                deletes.append(date)
+                log_id = int(df.iloc[df_idx]["id"])
+                deletes.append(log_id)
             except KeyError:
                 raise KeyError(
-                    "Failed to delete log: no row at dataframe index {df_idx}"
+                    f"Failed to delete {model}: no row at dataframe index {df_idx}"
                 )
-
         if len(deletes) > 0:
-            stmt = delete(Log).where(Log.date.in_(deletes))
+            stmt = delete(model).where(model.id.in_(deletes))
             DatabaseManager.operation_many(stmt)
 
     def get_logs_as_df(self) -> pd.DataFrame:
@@ -61,6 +63,11 @@ class DatabaseManager:
         df = pd.read_sql_query(select(Supervisor), con=engine)
         self.supervisor_df = df.sort_values(by=["name", "workplace_id"], ascending=True)
         return self.supervisor_df
+
+    def get_workplaces_as_df(self) -> pd.DataFrame:
+        df = pd.read_sql_query(select(Workplace), con=engine)
+        self.workplace_df = df.sort_values(by=["name"], ascending=True)
+        return self.workplace_df
 
     def get_supervisors(self) -> list[Supervisor]:
         self.supervisors = DatabaseManager.query(select(Supervisor))

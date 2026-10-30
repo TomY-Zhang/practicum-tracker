@@ -15,7 +15,9 @@ MAX_DATAFRAME_HEIGHT = 350  # 10 rows, 35 pixels per row
 dbm = DatabaseManager()
 st.session_state.log_df = dbm.log_df
 st.session_state.sp_df = dbm.supervisor_df
-supervisors = dbm.get_supervisors
+st.session_state.wp_df = dbm.workplace_df
+supervisors = dbm.supervisors
+workplaces = dbm.workplaces
 
 
 class ViewScope(StrEnum):
@@ -23,7 +25,7 @@ class ViewScope(StrEnum):
     Month = "Month"
 
 
-def filter_view(view_date: date, scope: ViewScope):
+def filter_view(view_date: date, scope: ViewScope, supervisor: Supervisor | None):
     df = st.session_state.log_df
 
     if scope == ViewScope.Week:
@@ -36,6 +38,9 @@ def filter_view(view_date: date, scope: ViewScope):
         mask = (df["date"] >= Timestamp(first_day_of_month)) & (
             df["date"] <= Timestamp(last_day_of_month)
         )
+
+    if supervisor:
+        mask = mask & (df["supervisor_id"] == supervisor.id)
 
     st.session_state.log_df = df.loc[mask]
 
@@ -113,8 +118,9 @@ def log_entry_dialog():
                 st.rerun()
             except IntegrityError:
                 st.toast(
-                    f"Log entry for {date_str} already exists.",
+                    f"Log entry for {date_str} with supervisor {supervisor_label(supervisor.id)} already exists.",
                     icon="🚫",
+                    duration=2,
                 )
 
 
@@ -129,12 +135,15 @@ def add_supervisor_dialog():
             st.toast(
                 f"Supervisor name '{name}' is already taken. Please enter another name.",
                 icon="🚫",
+                duration=2,
             )
 
     with st.form("Add Supervisor Form"):
         name = st.text_input("Supervisor Name", max_chars=100)
         workplace = st.selectbox(
-            "Workplace", options=dbm.workplaces, format_func=lambda w: w.name
+            "Workplace",
+            options=dbm.workplaces,
+            format_func=lambda w: w.name,
         )
         if st.form_submit_button("Submit", use_container_width=True, type="primary"):
             if name and workplace:
@@ -177,21 +186,31 @@ def add_workplace_dialog():
 
 
 def render_log_editor():
-    st.subheader("Logs")
-    row1 = st.columns([88, 6, 6], gap="xsmall", vertical_alignment="top")
-    with row1[-2]:
+    row1 = st.columns([6, 72, 6, 6, 10], gap="xsmall", vertical_alignment="bottom")
+    with row1[0]:
+        st.subheader("Logs")
+    with row1[-3]:
         view_date = st.date_input(
             "View Date",
             label_visibility="collapsed",
             key="view_scope_date",
         )
-    with row1[-1]:
+    with row1[-2]:
         view_scope = st.selectbox(
             "View Scope",
             label_visibility="collapsed",
             options=[v for v in ViewScope],
         )
-    filter_view(view_date, view_scope)
+    with row1[-1]:
+        view_supervisor = st.selectbox(
+            "View Supervisor",
+            label_visibility="collapsed",
+            options=[s for s in dbm.supervisors],
+            format_func=lambda s: supervisor_label(s.id),
+            index=None,
+            placeholder="Select a supervisor",
+        )
+    filter_view(view_date, view_scope, view_supervisor)
     st.data_editor(
         st.session_state.log_df,
         column_config={
@@ -241,13 +260,13 @@ def render_log_editor():
             "hours_b2",
         ],
         num_rows="delete",
-        disabled=["_index"],
+        disabled=["_index", "id"],
         hide_index=True,
         key="log_editor",
         height=get_df_height(st.session_state.log_df),
     )
 
-    row = st.columns([87, 8, 5], gap="xsmall")
+    row = st.columns([92, 8])
     with row[1]:
         st.button(
             "Add Log Entry",
@@ -255,10 +274,6 @@ def render_log_editor():
             use_container_width=True,
             icon="📝",
         )
-    with row[2]:
-        if st.button("Save", key="save_logs", type="primary", use_container_width=True):
-            dbm.save(Log, st.session_state.log_editor)
-            st.toast("Saved log data", icon="✅", duration=1)
 
 
 def render_supervisor_editor():
@@ -267,20 +282,22 @@ def render_supervisor_editor():
         st.session_state.sp_df,
         column_config={
             "name": st.column_config.TextColumn(
-                label="👨‍💼 Supervisor",
-                help="Supervisor name",
+                label="🏷️ Name",
                 required=True,
             ),
             "workplace_id": st.column_config.SelectboxColumn(
                 label="🏢 Workplace",
                 help="Select a workplace",
-                options=(float(w.id) for w in dbm.workplaces),
+                options=(str(w.id) for w in dbm.workplaces),
+                format_func=lambda id_: next(
+                    w.name for w in dbm.workplaces if w.id == int(id_)
+                ),
                 required=True,
             ),
         },
         column_order=["name", "workplace_id"],
         num_rows="delete",
-        disabled=["_index"],
+        disabled=["_index", "id"],
         hide_index=True,
         key="sp_editor",
         height=get_df_height(
@@ -288,7 +305,7 @@ def render_supervisor_editor():
         ),
     )
 
-    row = st.columns([87, 8, 5], gap="xsmall")
+    row = st.columns([92, 8])
     with row[1]:
         st.button(
             "Add Supervisor",
@@ -296,19 +313,58 @@ def render_supervisor_editor():
             use_container_width=True,
             icon="👨‍💼",
         )
-    with row[2]:
-        if st.button(
-            "Save", key="save_supervisor", type="primary", use_container_width=True
-        ):
-            dbm.save(Supervisor, st.session_state.sp_editor)
-            st.toast("Saved supervisor data", icon="✅", duration=1)
+
+
+def render_workplace_editor():
+    st.subheader("Workplaces")
+    st.data_editor(
+        st.session_state.wp_df,
+        column_config={
+            "name": st.column_config.TextColumn(label="🏷️ Name", required=True),
+            "street": st.column_config.TextColumn(label="🛣️ Street", required=True),
+            "city": st.column_config.TextColumn(label="🏙️ City", required=True),
+            "state": st.column_config.TextColumn(label="🏛️ State", required=True),
+            "zipcode": st.column_config.NumberColumn(
+                label="📫 Zip code", required=True
+            ),
+        },
+        column_order=["name", "street", "city", "state", "zipcode"],
+        num_rows="delete",
+        disabled=["_index", "id"],
+        hide_index=True,
+        key="wp_editor",
+        height=get_df_height(
+            st.session_state.wp_df,
+        ),
+    )
+
+    row = st.columns([92, 8])
+    with row[1]:
+        st.button(
+            "Add Workplace",
+            on_click=add_workplace_dialog,
+            use_container_width=True,
+            icon="🏢",
+        )
 
 
 st.title("📝 Timesheet")
 tabs = st.tabs(["Timesheet", "Associate"])
 with tabs[0]:
+    row = st.columns([95, 5])
+    with row[1]:
+        if st.button("Save all", type="primary", use_container_width=True):
+            try:
+                dbm.save(Log, st.session_state.log_df)
+                dbm.save(Supervisor, st.session_state.sp_editor)
+                dbm.save(Workplace, st.session_state.wp_editor)
+                st.toast("Saved all tables", icon="✅", duration=1)
+            except Exception as e:  # noqa: BLE001
+                st.toast(f"{e}", icon="🚫")
     render_log_editor()
-    st.space(size="large")
+    st.space(size="xsmall")
     render_supervisor_editor()
+    st.space(size="xsmall")
+    render_workplace_editor()
 with tabs[1]:
     pass
