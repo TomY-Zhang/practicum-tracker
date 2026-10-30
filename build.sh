@@ -27,15 +27,16 @@ while [[ $# -gt 0 ]]; do
 done
 
 REPO_ROOT=$(git rev-parse --show-toplevel)
-cd ${REPO_ROOT}
 
 if [[ ${BUILD_ALL:-0} == 1 ]] || [[ ${BUILD_STREAMLIT:-0} == 1 ]]; then 
+    cd ${REPO_ROOT}/streamlit-app
     uv run pyinstaller --clean webapp.spec
 fi
 
 if [[ ${BUILD_ALL:-0} == 1 ]] || [[ ${BUILD_TAURI:-0} == 1 ]]; then 
+    cd ${REPO_ROOT}
     HOST_TRIPLET=$(rustc -Vv | grep host | cut -f2 -d' ')
     mkdir -p tauri-app/binaries
-    PRACTICUM_TRACKER_DB=${PRACTICUM_TRACKER_DB:-} cp -f dist/tracker tauri-app/binaries/tracker-${HOST_TRIPLET}
+    PRACTICUM_TRACKER_DB=${PRACTICUM_TRACKER_DB:-} cp -f streamlit-app/dist/tracker tauri-app/binaries/tracker-${HOST_TRIPLET}
     pnpm tauri build
 fi
