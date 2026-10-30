@@ -1,45 +1,144 @@
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
+from enum import StrEnum
 
 import streamlit as st
-from pandas import DataFrame, Timestamp
+from dateutil.relativedelta import relativedelta
+from pandas import Timestamp
+from sqlalchemy.exc import IntegrityError
 
-from webapp.backend import DatabaseManager
-from webapp.backend.models import Supervisor, Workplace
-from webapp.backend.pdf import Column, TemplateEditor
-from webapp.config import GENERATED_PDF_NAME, TEMPLATE_FILE_PATH
+from webapp.lib.manager import DatabaseManager
+from webapp.lib.models import Log, Supervisor, Workplace
 
 dbm = DatabaseManager()
+st.session_state.df = dbm.df
 
 
-def load_session() -> None:
-    st.session_state.df = dbm.df
-    st.session_state.supervisors = dbm.supervisors
-    st.session_state.workplaces = dbm.workplaces
-    print(st.session_state.workplaces)
+class ViewScope(StrEnum):
+    Week = "Week"
+    Month = "Month"
+
+
+def update_filter_absolute():
+    print("TEST")
+    date = st.session_state.view_scope_date
+    print("NICE", date)
+
+
+def filter_view(view_date: date, scope: ViewScope):
+    df = st.session_state.df
+
+    if scope == ViewScope.Week:
+        start = get_week_start_sunday(view_date)
+        end = start + timedelta(days=6)
+        mask = (df["date"] >= Timestamp(start)) & (df["date"] <= Timestamp(end))
+    else:
+        first_day_of_month = view_date.replace(day=1)
+        last_day_of_month = view_date + relativedelta(days=31)
+        mask = (df["date"] >= Timestamp(first_day_of_month)) & (
+            df["date"] <= Timestamp(last_day_of_month)
+        )
+
+    st.session_state.df = df.loc[mask]
+
+
+def supervisor_label(supervisor_id: int) -> str:
+    supervisor = next(s for s in dbm.supervisors if s.id == supervisor_id)
+    workplace = next(w for w in dbm.workplaces if w.id == supervisor.workplace_id)
+    return f"{supervisor.name} ({workplace.name})"
+
+
+def get_week_start_sunday(dt: date) -> date:
+    days_since_sunday = (dt.weekday() + 1) % 7
+    return dt - timedelta(days=days_since_sunday)
+
+
+@st.dialog("New Log Entry", width="medium")
+def log_entry_dialog():
+    with st.form("log_entry_form"):
+        rows = [st.columns([1, 1]) for _ in range(4)]
+        with rows[0][0]:
+            date = st.date_input("🗓️ Date")
+        with rows[0][1]:
+            supervisor = st.selectbox(
+                label="👨‍💼 Supervisor",
+                options=dbm.supervisors,
+                format_func=lambda s: supervisor_label(s.id),
+            )
+        with rows[1][0]:
+            hours_a = st.number_input(
+                label="🫂 Direct Counseling (A)", value=0, min_value=0, max_value=24
+            )
+        with rows[1][1]:
+            hours_b = st.number_input(
+                label="💡 Non-Clinical Experience (B)",
+                value=0,
+                min_value=0,
+                max_value=24,
+            )
+        with rows[2][0]:
+            hours_a1 = st.number_input(
+                label="🩺 Diagnosis & Treatment (A1)",
+                value=0,
+                min_value=0,
+                max_value=24,
+            )
+        with rows[2][1]:
+            hours_b1 = st.number_input(
+                label="🕵🏻‍♂️ Supervision, Individual, Triadic (B1)",
+                value=0,
+                min_value=0,
+                max_value=24,
+            )
+        with rows[3][1]:
+            hours_b2 = st.number_input(
+                label="🔍 Supervision, Group (B2)", value=0, min_value=0, max_value=24
+            )
+        if st.form_submit_button("Submit", type="primary", use_container_width=True):
+            date_str = date.strftime("%Y-%m-%d")
+            log = Log(
+                date=date_str,
+                supervisor_id=supervisor.id,
+                hours_a=hours_a,
+                hours_a1=hours_a1,
+                hours_b=hours_b,
+                hours_b1=hours_b1,
+                hours_b2=hours_b2,
+            )
+            try:
+                dbm.insert(log)
+                st.toast(f"Added log entry for {date_str}.", icon="✅")
+                st.rerun()
+            except IntegrityError:
+                st.toast(
+                    f"Log entry for {date_str} already exists.",
+                    icon="🚫",
+                )
 
 
 @st.dialog("Add Supervisor", icon="👨‍💼")
 def add_supervisor_dialog():
     with st.form("Add Supervisor Form"):
         name = st.text_input("Supervisor Name", max_chars=100)
-
-        workplace_names: list[str] = list(st.session_state.workplaces.keys())
-        workplace = st.selectbox("Workplace", workplace_names)
-
+        workplace = st.selectbox(
+            "Workplace", options=dbm.workplaces, format_func=lambda w: w.name
+        )
         if st.form_submit_button("Submit", use_container_width=True, type="primary"):
             if name and workplace:
-                wp_id = st.session_state.workplaces.get(workplace)
-                if wp_id:
-                    DatabaseManager.insert(Supervisor(name=name, workplace_id=wp_id))
-                else:
+                try:
+                    DatabaseManager.insert(
+                        Supervisor(name=name, workplace_id=workplace.id)
+                    )
                     st.toast(
-                        f"Error: unable to determine ID for workplace '{workplace}'",
+                        f"Added new supervisor '{name}' ({workplace.name}).", icon="✅"
+                    )
+                    st.rerun()
+                except IntegrityError:
+                    st.toast(
+                        f"Supervisor name '{name}' is already taken. Please enter another name.",
                         icon="🚫",
                     )
-                st.toast(f"Added new supervisor '{name}'", icon="✅")
-                st.rerun()
             else:
-                st.toast("Please fill out all fields", icon="🚫")
+                st.toast("Please fill out all fields.", icon="🚫")
 
 
 @st.dialog("Add Workplace", icon="🏢")
@@ -67,181 +166,106 @@ def add_workplace_dialog():
                             zipcode=zipcode,
                         )
                     )
-                    st.toast(f"Added new workplace '{name}'", icon="✅")
+                    st.toast(f"Added new workplace '{name}'.", icon="✅")
                     st.rerun()
                 else:
-                    st.toast("Zip code can only contain numbers", icon="🚫")
+                    st.toast("Zip code can only contain numbers.", icon="🚫")
             else:
-                st.toast("Please fill out all fields", icon="🚫")
+                st.toast("Please fill out all fields.", icon="🚫")
 
 
-@st.dialog("Save to PDF", icon="📥")
-def save_pdf_dialog():
-    now = datetime.now()  # noqa: DTZ005
-    selected_dates = st.date_input(
-        "Select a date range (up to 10 weeks)",
-        help="Days in the same week as the start and end dates will be included. A week is defined as Sunday through Saturday.",
-        value=(now, now),
+st.title("📝 Timesheet")
+
+row1 = st.columns([88, 6, 6], gap="xsmall")
+with row1[-2]:
+    view_date = st.date_input(
+        "Date",
+        label_visibility="collapsed",
+        key="view_scope_date",
+        on_change=update_filter_absolute,
+    )
+with row1[-1]:
+    view_scope = st.selectbox(
+        "View Scope",
+        label_visibility="collapsed",
+        options=[v for v in ViewScope],
     )
 
-    try:
-        st.download_button(
-            label="Download",
-            data=pdf_bytes(selected_dates),
-            file_name=GENERATED_PDF_NAME,
-            mime="application/pdf",
-        )
-    except ValueError as e:
-        st.toast(str(e), icon="🚫")
-    except LookupError:
-        pass
+filter_view(view_date, view_scope)
+st.data_editor(
+    st.session_state.df,
+    column_config={
+        "date": st.column_config.DateColumn(
+            label="🗓️ Date",
+            help="Log Entry Date",
+            format="YYYY-MM-DD",
+            disabled=True,
+        ),
+        "supervisor_id": st.column_config.SelectboxColumn(
+            label="👨‍💼 Supervisor",
+            help="Select a supervisor",
+            options=(float(s.id) for s in dbm.supervisors),
+            format_func=lambda id_: supervisor_label(int(id_)),
+            required=True,
+        ),
+        "hours_a": st.column_config.NumberColumn(
+            "🫂 Direct Counseling",
+            help="Individuals, groups, couples, and families",
+            default=0,
+        ),
+        "hours_a1": st.column_config.NumberColumn(
+            label="🩺 Diagnosis & Treatment",
+            help="Couples, families, and children",
+            default=0,
+        ),
+        "hours_b": st.column_config.NumberColumn(
+            label="💡 Non-Clinical Experience",
+            default=0,
+        ),
+        "hours_b1": st.column_config.NumberColumn(
+            label="🕵🏻‍♂️ Supervision, Individual, & Triadic",
+            default=0,
+        ),
+        "hours_b2": st.column_config.NumberColumn(
+            label="🔍 Supervision, Group",
+            default=0,
+        ),
+    },
+    column_order=[
+        "date",
+        "supervisor_id",
+        "hours_a",
+        "hours_a1",
+        "hours_b",
+        "hours_b1",
+        "hours_b2",
+    ],
+    num_rows="delete",
+    disabled=["_index"],
+    hide_index=True,
+    key="editor",
+)
 
-
-def pdf_bytes(selected_dates: tuple) -> bytes:
-    validate_date_range(selected_dates)
-    start = get_week_start_sunday(selected_dates[0])
-    end = get_week_end_saturday(selected_dates[1])
-
-    df: DataFrame = st.session_state.df
-    mask = (df["date"] >= Timestamp(start)) & (df["date"] <= Timestamp(end))
-    supervisors = df.loc[mask, "name"].unique()
-
-    template_editor = TemplateEditor(TEMPLATE_FILE_PATH)
-    template_editor.set_year(start.year)
-    if len(supervisors) > 1:
-        raise ValueError(
-            "Selected date range contains logs for multiple supervisors. Please select a date range that contains logs for only one supervisor."
-        )
-    elif len(supervisors) == 1:
-        template_editor.set_supervisor_name(supervisors[0])
-
-    week = 1
-    column_totals = {c: 0 for c in Column}
-    while start <= end:
-        week_end = min(start + timedelta(days=6), end)
-        mask = (df["date"] >= Timestamp(start)) & (df["date"] <= Timestamp(week_end))
-        hours = df.loc[mask].sum(numeric_only=True)
-        week_total = hours.sum(numeric_only=True)
-
-        template_editor.set_week_date(week, start)
-        template_editor.set_table_cell(Column.A, week, hours["hours_a"])
-        template_editor.set_table_cell(Column.A1, week, hours["hours_a1"])
-        template_editor.set_table_cell(Column.B, week, hours["hours_b"])
-        template_editor.set_table_cell(Column.B1, week, hours["hours_b1"])
-        template_editor.set_table_cell(Column.B2, week, hours["hours_b2"])
-        template_editor.set_table_cell(Column.C, week, week_total)
-
-        column_totals[Column.A] += hours["hours_a"]
-        column_totals[Column.A1] += hours["hours_a1"]
-        column_totals[Column.B] += hours["hours_b"]
-        column_totals[Column.B1] += hours["hours_b1"]
-        column_totals[Column.B2] += hours["hours_b2"]
-        column_totals[Column.C] += week_total
-
-        start += timedelta(days=7)
-        week += 1
-
-    for column, total in column_totals.items():
-        template_editor.set_column_total(column, total)
-
-    return template_editor.write_to_bytes()
-
-
-def validate_date_range(selected_dates: tuple):
-    if len(selected_dates) != 2:
-        raise LookupError
-
-    start = get_week_start_sunday(selected_dates[0])
-    end = get_week_end_saturday(selected_dates[1])
-    if end - start > timedelta(weeks=10):
-        raise ValueError("Selected date range exceeds 10 weeks")
-
-
-def get_week_start_sunday(dt: date) -> date:
-    days_since_sunday = (dt.weekday() + 1) % 7
-    return dt - timedelta(days=days_since_sunday)
-
-
-def get_week_end_saturday(dt: date) -> date:
-    days_until_saturday = (5 - dt.weekday()) % 7
-    return dt + timedelta(days=days_until_saturday)
-
-
-def render_page() -> None:
-    st.title("📝 Timesheet")
-
-    st.data_editor(
-        st.session_state.df,
-        column_config={
-            "date": st.column_config.DateColumn(
-                label="🗓️ Date",
-                help="Date of log entry",
-                format="YYYY-MM-DD",
-                required=True,
-            ),
-            "name": st.column_config.SelectboxColumn(
-                label="👨‍💼 Supervisor",
-                help="Select your supervisor",
-                options=st.session_state.supervisors.keys(),
-                required=True,
-            ),
-            "hours_a": st.column_config.NumberColumn(
-                "🫂 Direct Counseling",
-                help="Individuals, groups, couples, and families",
-                default=0,
-            ),
-            "hours_a1": st.column_config.NumberColumn(
-                label="🩺 Diagnosis & Treatment",
-                help="Couples, families, and children",
-                default=0,
-            ),
-            "hours_b": st.column_config.NumberColumn(
-                label="💡 Non-Clinical Experience",
-                default=0,
-            ),
-            "hours_b1": st.column_config.NumberColumn(
-                label="🕵🏻‍♂️ Supervision, Individual, & Triadic",
-                default=0,
-            ),
-            "hours_b2": st.column_config.NumberColumn(
-                label="🔍 Supervision, Group",
-                default=0,
-            ),
-        },
-        column_order=[
-            "date",
-            "name",
-            "hours_a",
-            "hours_a1",
-            "hours_b",
-            "hours_b1",
-            "hours_b2",
-        ],
-        disabled=["_index"],
-        key="editor",
-        num_rows="dynamic",
-        height="content",
+row2 = st.columns([71, 8, 8, 8, 5], gap="xsmall")
+with row2[-4]:
+    st.button(
+        "Add Log Entry", on_click=log_entry_dialog, use_container_width=True, icon="📝"
     )
-
-    cols = st.columns([15, 3, 3, 3, 2])
-
-    with cols[-4]:
-        if st.button("Add Supervisor", use_container_width=True, icon="👨‍💼"):
-            add_supervisor_dialog()
-
-    with cols[-3]:
-        if st.button("Add Workplace", use_container_width=True, icon="🏢"):
-            add_workplace_dialog()
-
-    with cols[-2]:
-        if st.button("Save to PDF", use_container_width=True, icon="📥"):
-            save_pdf_dialog()
-
-    with cols[-1]:
-        if st.button("Save", use_container_width=True, type="primary", icon="💾"):
-            dbm.save(st.session_state.editor)
-            st.toast("Timesheet successfully saved", icon="✅")
-
-
-load_session()
-render_page()
+with row2[-3]:
+    st.button(
+        "Add Supervisor",
+        on_click=add_supervisor_dialog,
+        use_container_width=True,
+        icon="👨‍💼",
+    )
+with row2[-2]:
+    st.button(
+        "Add Workplace",
+        on_click=add_workplace_dialog,
+        use_container_width=True,
+        icon="🏢",
+    )
+with row2[-1]:
+    if st.button("Save", type="primary", use_container_width=True):
+        dbm.save(st.session_state.editor)
+        st.toast("Timesheet successfully saved", icon="✅")
