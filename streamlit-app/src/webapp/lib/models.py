@@ -1,4 +1,4 @@
-from sqlalchemy import ForeignKey, Index, Integer, String, text
+from sqlalchemy import Float, ForeignKey, Index, Integer, String, text
 from sqlalchemy.orm import (
     DeclarativeBase,
     Mapped,
@@ -54,17 +54,15 @@ class Log(Base):
     __tablename__ = "log"
     __table_args__ = (Index("date", "supervisor_id", unique=True),)
 
-    def _int_column() -> MappedColumn:
-        return mapped_column(
-            Integer, nullable=False, default=0, server_default=text("0")
-        )
+    def _float_column() -> MappedColumn:
+        return mapped_column(Float, nullable=False, default=0, server_default=text("0"))
 
     date: Mapped[str] = mapped_column(String(10), nullable=False)
-    hours_a: Mapped[int] = _int_column()
-    hours_a1: Mapped[int] = _int_column()
-    hours_b: Mapped[int] = _int_column()
-    hours_b1: Mapped[int] = _int_column()
-    hours_b2: Mapped[int] = _int_column()
+    hours_a: Mapped[int] = _float_column()
+    hours_a1: Mapped[int] = _float_column()
+    hours_b: Mapped[int] = _float_column()
+    hours_b1: Mapped[int] = _float_column()
+    hours_b2: Mapped[int] = _float_column()
     supervisor_id: Mapped[int] = mapped_column(ForeignKey("supervisor.id"))
 
     supervisor: Mapped[Supervisor] = relationship(back_populates="logs")

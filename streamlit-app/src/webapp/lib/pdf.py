@@ -67,7 +67,7 @@ class TemplateEditor:
     def set_week_date(self, week_no: int, value: date) -> None:
         self.update_field(f"week_{week_no}", f"{value.month}/{value.day}")
 
-    def set_table_cell(self, column: Column, week_no: int, value: int):
+    def set_table_cell(self, column: Column, week_no: int, value: float):
         self.update_field(f"{column}_{week_no}", str(value))
 
     def set_column_total(self, column: Column, value: int) -> None:

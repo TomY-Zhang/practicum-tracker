@@ -20,6 +20,21 @@ supervisors = dbm.supervisors
 workplaces = dbm.workplaces
 
 
+def supervisor_label(supervisor_id: int) -> str:
+    supervisor = next(s for s in dbm.supervisors if s.id == supervisor_id)
+    workplace = next(w for w in dbm.workplaces if w.id == supervisor.workplace_id)
+    return f"{supervisor.name} ({workplace.name})"
+
+
+def get_week_start_sunday(dt: date) -> date:
+    days_since_sunday = (dt.weekday() + 1) % 7
+    return dt - timedelta(days=days_since_sunday)
+
+
+def get_df_height(df: DataFrame):
+    return MAX_DATAFRAME_HEIGHT if len(df) >= MAX_ROWS else "auto"
+
+
 class ViewScope(StrEnum):
     Week = "Week"
     Month = "Month"
@@ -45,21 +60,6 @@ def filter_view(view_date: date, scope: ViewScope, supervisor: Supervisor | None
     st.session_state.log_df = df.loc[mask]
 
 
-def supervisor_label(supervisor_id: int) -> str:
-    supervisor = next(s for s in dbm.supervisors if s.id == supervisor_id)
-    workplace = next(w for w in dbm.workplaces if w.id == supervisor.workplace_id)
-    return f"{supervisor.name} ({workplace.name})"
-
-
-def get_week_start_sunday(dt: date) -> date:
-    days_since_sunday = (dt.weekday() + 1) % 7
-    return dt - timedelta(days=days_since_sunday)
-
-
-def get_df_height(df: DataFrame):
-    return MAX_DATAFRAME_HEIGHT if len(df) >= MAX_ROWS else "auto"
-
-
 @st.dialog("New Log Entry", width="medium")
 def log_entry_dialog():
     with st.form("log_entry_form"):
@@ -74,32 +74,38 @@ def log_entry_dialog():
             )
         with rows[1][0]:
             hours_a = st.number_input(
-                label="🫂 Direct Counseling (A)", value=0, min_value=0, max_value=24
+                label="🫂 Direct Counseling (A)",
+                value=0.0,
+                min_value=0.0,
+                max_value=24.0,
             )
         with rows[1][1]:
             hours_b = st.number_input(
                 label="💡 Non-Clinical Experience (B)",
-                value=0,
-                min_value=0,
-                max_value=24,
+                value=0.0,
+                min_value=0.0,
+                max_value=24.0,
             )
         with rows[2][0]:
             hours_a1 = st.number_input(
                 label="🩺 Diagnosis & Treatment (A1)",
-                value=0,
-                min_value=0,
-                max_value=24,
+                value=0.0,
+                min_value=0.0,
+                max_value=24.0,
             )
         with rows[2][1]:
             hours_b1 = st.number_input(
                 label="🕵🏻‍♂️ Supervision, Individual, Triadic (B1)",
-                value=0,
-                min_value=0,
-                max_value=24,
+                value=0.0,
+                min_value=0.0,
+                max_value=24.0,
             )
         with rows[3][1]:
             hours_b2 = st.number_input(
-                label="🔍 Supervision, Group (B2)", value=0, min_value=0, max_value=24
+                label="🔍 Supervision, Group (B2)",
+                value=0.0,
+                min_value=0.0,
+                max_value=24.0,
             )
         if st.form_submit_button("Submit", type="primary", use_container_width=True):
             date_str = date.strftime("%Y-%m-%d")
@@ -186,7 +192,7 @@ def add_workplace_dialog():
 
 
 def render_log_editor():
-    row1 = st.columns([12, 54, 12, 12, 20], gap="xsmall", vertical_alignment="bottom")
+    row1 = st.columns([12, 58, 9, 9, 12], gap="xsmall", vertical_alignment="bottom")
     with row1[0]:
         st.subheader("Logs")
     with row1[-3]:
@@ -230,24 +236,29 @@ def render_log_editor():
             "hours_a": st.column_config.NumberColumn(
                 "🫂 Direct Counseling",
                 help="Individuals, groups, couples, and families",
-                default=0,
+                default=0.0,
+                step=0.01,
             ),
             "hours_a1": st.column_config.NumberColumn(
                 label="🩺 Diagnosis & Treatment",
                 help="Couples, families, and children",
-                default=0,
+                default=0.0,
+                step=0.01,
             ),
             "hours_b": st.column_config.NumberColumn(
                 label="💡 Non-Clinical Experience",
-                default=0,
+                default=0.0,
+                step=0.01,
             ),
             "hours_b1": st.column_config.NumberColumn(
                 label="🕵🏻‍♂️ Supervision, Individual, & Triadic",
-                default=0,
+                default=0.0,
+                step=0.01,
             ),
             "hours_b2": st.column_config.NumberColumn(
                 label="🔍 Supervision, Group",
-                default=0,
+                default=0.0,
+                step=0.01,
             ),
         },
         column_order=[
@@ -266,7 +277,7 @@ def render_log_editor():
         height=get_df_height(st.session_state.log_df),
     )
 
-    row = st.columns([84, 16])
+    row = st.columns([88, 12])
     with row[1]:
         st.button(
             "Add Log Entry",
@@ -305,7 +316,7 @@ def render_supervisor_editor():
         ),
     )
 
-    row = st.columns([84, 16])
+    row = st.columns([88, 12])
     with row[1]:
         st.button(
             "Add Supervisor",
@@ -338,7 +349,7 @@ def render_workplace_editor():
         ),
     )
 
-    row = st.columns([84, 16])
+    row = st.columns([88, 12])
     with row[1]:
         st.button(
             "Add Workplace",
@@ -348,14 +359,18 @@ def render_workplace_editor():
         )
 
 
+def render_associate_editor():
+    st.subheader("Supervisors")
+
+
 st.title("📝 Timesheet")
-tabs = st.tabs(["Timesheet", "Associate"])
+tabs = st.tabs(["Timesheet"])
 with tabs[0]:
     row = st.columns([90, 10])
     with row[1]:
         if st.button("Save all", type="primary", use_container_width=True):
             try:
-                dbm.save(Log, st.session_state.log_df)
+                dbm.save(Log, st.session_state.log_editor)
                 dbm.save(Supervisor, st.session_state.sp_editor)
                 dbm.save(Workplace, st.session_state.wp_editor)
                 st.toast("Saved all tables", icon="✅", duration=1)
